@@ -16,7 +16,7 @@ import sinchonthon4.demo.domain.networking.dto.NetworkingProfileSearchCondition;
 public class JpaNetworkingProfileRepository implements NetworkingProfileRepository {
 
     private static final String PROFILE_PROJECTION = """
-            SELECT p.id, p.user.id, p.user.name, p.profileImageUrl, p.school, p.major,
+            SELECT p.id, p.user.id, p.nickname, p.profileImageUrl, p.school, p.major,
                    p.grade, p.position, p.introduction, p.githubUrl, p.linkedinUrl,
                    p.portfolioUrl
             FROM Profile p
@@ -28,7 +28,7 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
     public NetworkingProfilePage findAll(NetworkingProfileSearchCondition condition) {
         QueryParts queryParts = buildQueryParts(condition);
         TypedQuery<Object[]> query = entityManager.createQuery(
-                PROFILE_PROJECTION + queryParts.joinClause() + queryParts.whereClause()
+                PROFILE_PROJECTION + queryParts.whereClause()
                         + " ORDER BY p.id DESC",
                 Object[].class
         );
@@ -42,7 +42,7 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
 
         TypedQuery<Long> countQuery = entityManager.createQuery(
                 "SELECT COUNT(DISTINCT p.id) FROM Profile p "
-                        + queryParts.joinClause() + queryParts.whereClause(),
+                        + queryParts.whereClause(),
                 Long.class
         );
         applyParameters(countQuery, queryParts.parameters());
@@ -68,10 +68,8 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
     private QueryParts buildQueryParts(NetworkingProfileSearchCondition condition) {
         List<String> predicates = new ArrayList<>();
         Map<String, Object> parameters = new HashMap<>();
-        String joinClause = "";
-
         if (hasText(condition.name())) {
-            predicates.add("LOWER(p.user.name) LIKE :name");
+            predicates.add("LOWER(p.nickname) LIKE :name");
             parameters.put("name", "%" + condition.name().trim().toLowerCase() + "%");
         }
         if (hasText(condition.school())) {
@@ -84,16 +82,21 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
         }
         if (hasText(condition.position())) {
             predicates.add("CAST(p.position AS string) = :position");
-            parameters.put("position", condition.position().trim());
+            parameters.put("position", positionFilterValue(condition.position()));
         }
         if (condition.skillId() != null) {
-            joinClause = " JOIN p.skills filteredSkill ";
-            predicates.add("filteredSkill.id = :skillId");
+            predicates.add("""
+                    EXISTS (
+                        SELECT profileSkill.id
+                        FROM ProfileSkill profileSkill
+                        WHERE profileSkill.profile = p AND profileSkill.skill.id = :skillId
+                    )
+                    """);
             parameters.put("skillId", condition.skillId());
         }
 
         String whereClause = predicates.isEmpty() ? "" : " WHERE " + String.join(" AND ", predicates);
-        return new QueryParts(joinClause, whereClause, parameters);
+        return new QueryParts(whereClause, parameters);
     }
 
     private void applyParameters(TypedQuery<?> query, Map<String, Object> parameters) {
@@ -108,11 +111,10 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
         Map<Long, List<String>> skillsByProfileId = new HashMap<>();
         entityManager.createQuery(
                         """
-                        SELECT p.id, skill.name
-                        FROM Profile p
-                        JOIN p.skills skill
-                        WHERE p.id IN :profileIds
-                        ORDER BY skill.name
+                        SELECT profileSkill.profile.id, profileSkill.skill.name
+                        FROM ProfileSkill profileSkill
+                        WHERE profileSkill.profile.id IN :profileIds
+                        ORDER BY profileSkill.skill.name
                         """,
                         Object[].class
                 )
@@ -134,7 +136,7 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
     private NetworkingProfileRecord toRecord(Object[] row) {
         return new NetworkingProfileRecord(
                 (Long) row[0], (Long) row[1], (String) row[2], (String) row[3],
-                (String) row[4], (String) row[5], (Integer) row[6], row[7].toString(),
+                (String) row[4], (String) row[5], (Integer) row[6], apiPosition(row[7].toString()),
                 (String) row[8], (String) row[9], (String) row[10], (String) row[11],
                 List.of()
         );
@@ -144,8 +146,15 @@ public class JpaNetworkingProfileRepository implements NetworkingProfileReposito
         return value != null && !value.isBlank();
     }
 
+    private String positionFilterValue(String position) {
+        return "UX_UI_DESIGNER".equals(position.trim()) ? "DESIGN" : position.trim();
+    }
+
+    private String apiPosition(String position) {
+        return "DESIGN".equals(position) ? "UX_UI_DESIGNER" : position;
+    }
+
     private record QueryParts(
-            String joinClause,
             String whereClause,
             Map<String, Object> parameters
     ) {

@@ -12,12 +12,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import sinchonthon4.demo.domain.group.entity.enums.GroupMemberStatus;
 import sinchonthon4.demo.domain.group.entity.enums.GroupStatus;
-import sinchonthon4.demo.domain.networking.entity.enums.NetworkingEventStatus;
-import sinchonthon4.demo.domain.networking.entity.enums.NetworkingParticipantStatus;
 
 @Repository
 @RequiredArgsConstructor
 public class JpaHomeRepository implements HomeRepository {
+
+    private static final List<String> NETWORKING_CATEGORIES = List.of("커피챗", "네트워킹");
 
     private final EntityManager entityManager;
 
@@ -25,7 +25,7 @@ public class JpaHomeRepository implements HomeRepository {
     public Optional<HomeProfileRecord> findProfile(Long userId) {
         return entityManager.createQuery(
                         """
-                        SELECT p.user.id, p.user.name, p.profileImageUrl, p.school, p.position
+                        SELECT p.user.id, p.nickname, p.profileImageUrl, p.school, p.position
                         FROM Profile p
                         WHERE p.user.id = :userId
                         """,
@@ -65,7 +65,7 @@ public class JpaHomeRepository implements HomeRepository {
     public List<HomeProfileRecord> findRecommendedProfiles(Long userId, int limit) {
         List<Object[]> profiles = entityManager.createQuery(
                         """
-                        SELECT p.user.id, p.user.name, p.profileImageUrl, p.school, p.position
+                        SELECT p.user.id, p.nickname, p.profileImageUrl, p.school, p.position
                         FROM Profile p
                         WHERE p.user.id <> :userId
                         ORDER BY p.id DESC
@@ -97,6 +97,7 @@ public class JpaHomeRepository implements HomeRepository {
                         LEFT JOIN GroupMember approved
                                ON approved.group = g AND approved.status = :approved
                         WHERE g.status = :recruiting
+                          AND gc.name NOT IN :networkingCategories
                           AND NOT EXISTS (
                               SELECT mine.id
                               FROM GroupMember mine
@@ -111,6 +112,7 @@ public class JpaHomeRepository implements HomeRepository {
                 )
                 .setParameter("approved", GroupMemberStatus.APPROVED)
                 .setParameter("recruiting", GroupStatus.RECRUITING)
+                .setParameter("networkingCategories", NETWORKING_CATEGORIES)
                 .setParameter("userId", userId)
                 .setParameter("joinedStatuses", List.of(
                         GroupMemberStatus.PENDING,
@@ -136,32 +138,31 @@ public class JpaHomeRepository implements HomeRepository {
     public List<HomeNetworkingEventRecord> findNetworkingEvents(int limit) {
         return entityManager.createQuery(
                         """
-                        SELECT event.id, event.eventType, event.title,
-                               COUNT(participant.id), event.maxParticipants, event.status
-                        FROM NetworkingEvent event
-                        LEFT JOIN NetworkingEventParticipant participant
-                               ON participant.event = event AND participant.status = :approved
-                        WHERE event.status = :recruiting
-                        GROUP BY event.id, event.eventType, event.title,
-                                 event.maxParticipants, event.status, event.createdAt
-                        ORDER BY event.createdAt DESC
+                        SELECT g.id, g.title, gc.name, COUNT(member.id), g.maxMembers, g.status
+                        FROM Group g
+                        JOIN g.category gc
+                        LEFT JOIN GroupMember member
+                               ON member.group = g AND member.status = :approved
+                        WHERE g.status = :recruiting AND gc.name IN :networkingCategories
+                        GROUP BY g.id, g.title, gc.name, g.maxMembers, g.status, g.createdAt
+                        ORDER BY g.createdAt DESC
                         """,
                         Object[].class
                 )
-                .setParameter("approved", NetworkingParticipantStatus.APPROVED)
-                .setParameter("recruiting", NetworkingEventStatus.RECRUITING)
+                .setParameter("approved", GroupMemberStatus.APPROVED)
+                .setParameter("recruiting", GroupStatus.RECRUITING)
+                .setParameter("networkingCategories", NETWORKING_CATEGORIES)
                 .setMaxResults(limit)
                 .getResultList()
                 .stream()
                 .map(row -> {
-                    long currentParticipants = (Long) row[3];
-                    int maxParticipants = (Integer) row[4];
-                    NetworkingEventStatus status = (NetworkingEventStatus) row[5];
+                    long currentMembers = (Long) row[3];
+                    int maxMembers = (Integer) row[4];
+                    GroupStatus status = (GroupStatus) row[5];
                     return new HomeNetworkingEventRecord(
-                            (Long) row[0], row[1].toString(), (String) row[2],
-                            currentParticipants, maxParticipants,
-                            status == NetworkingEventStatus.RECRUITING
-                                    && currentParticipants < maxParticipants
+                            (Long) row[0], eventType((String) row[2]), (String) row[1],
+                            currentMembers, maxMembers,
+                            status == GroupStatus.RECRUITING && currentMembers < maxMembers
                     );
                 })
                 .toList();
@@ -169,6 +170,10 @@ public class JpaHomeRepository implements HomeRepository {
 
     @Override
     public List<HomeJobPostingRecord> findRecommendedJobPostings(int limit) {
+        if (!isEntityMapped("JobPosting")) {
+            return List.of();
+        }
+
         return entityManager.createQuery(
                         """
                         SELECT posting.id, posting.companyName, posting.title, posting.description,
@@ -192,11 +197,16 @@ public class JpaHomeRepository implements HomeRepository {
                 .toList();
     }
 
+    private boolean isEntityMapped(String entityName) {
+        return entityManager.getMetamodel().getEntities().stream()
+                .anyMatch(entityType -> entityType.getName().equals(entityName));
+    }
+
     private HomeProfileRecord toProfileRecord(Object[] profile, Map<Long, List<String>> skillNames) {
         Long userId = (Long) profile[0];
         return new HomeProfileRecord(
                 userId, (String) profile[1], (String) profile[2], (String) profile[3],
-                profile[4].toString(), skillNames.getOrDefault(userId, List.of())
+                apiPosition(profile[4].toString()), skillNames.getOrDefault(userId, List.of())
         );
     }
 
@@ -207,11 +217,10 @@ public class JpaHomeRepository implements HomeRepository {
         Map<Long, List<String>> result = new LinkedHashMap<>();
         entityManager.createQuery(
                         """
-                        SELECT p.user.id, skill.name
-                        FROM Profile p
-                        JOIN p.skills skill
-                        WHERE p.user.id IN :userIds
-                        ORDER BY skill.name
+                        SELECT profileSkill.profile.user.id, profileSkill.skill.name
+                        FROM ProfileSkill profileSkill
+                        WHERE profileSkill.profile.user.id IN :userIds
+                        ORDER BY profileSkill.skill.name
                         """,
                         Object[].class
                 )
@@ -237,5 +246,13 @@ public class JpaHomeRepository implements HomeRepository {
             case "네트워킹" -> "NETWORKING";
             default -> "OTHER";
         };
+    }
+
+    private String eventType(String categoryName) {
+        return "커피챗".equals(categoryName) ? "COFFEE_CHAT" : "NETWORKING";
+    }
+
+    private String apiPosition(String position) {
+        return "DESIGN".equals(position) ? "UX_UI_DESIGNER" : position;
     }
 }

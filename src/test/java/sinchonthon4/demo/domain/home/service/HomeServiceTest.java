@@ -34,7 +34,7 @@ class HomeServiceTest {
                 1L, "김지태", null, "서강대학교", "BACKEND", List.of("Java", "Spring Boot")
         );
         HomeProfileRecord recommended = new HomeProfileRecord(
-                2L, "김신충", null, "홍익대학교", "DESIGN", List.of("Figma", "Photoshop")
+                2L, "김신충", null, "홍익대학교", "UX_UI_DESIGNER", List.of("Figma", "Photoshop")
         );
 
         when(homeRepository.findProfile(1L)).thenReturn(Optional.of(mine));
@@ -45,7 +45,7 @@ class HomeServiceTest {
                 new HomeRecommendedGroupRecord(3L, "신촌 AI 사이드 프로젝트", "PROJECT", 3, 4, true)
         ));
         when(homeRepository.findNetworkingEvents(4)).thenReturn(List.of(
-                new HomeNetworkingEventRecord(1L, "COFFEE_CHAT", "신촌 개발자 커피챗", 2, 4, true)
+                new HomeNetworkingEventRecord(4L, "COFFEE_CHAT", "신촌 개발자 커피챗", 2, 4, true)
         ));
         when(homeRepository.findRecommendedJobPostings(4)).thenReturn(List.of(
                 new HomeJobPostingRecord(
@@ -58,7 +58,7 @@ class HomeServiceTest {
 
         assertThat(response.myProfile().userId()).isEqualTo(1L);
         assertThat(response.participatingGroups()).hasSize(1);
-        assertThat(response.recommendedProfiles().getFirst().position()).isEqualTo("DESIGN");
+        assertThat(response.recommendedProfiles().getFirst().position()).isEqualTo("UX_UI_DESIGNER");
         assertThat(response.recommendedGroups().getFirst().isJoinAvailable()).isTrue();
         assertThat(response.networkingEvents()).hasSize(1);
         assertThat(response.recommendedJobPostings()).hasSize(1);

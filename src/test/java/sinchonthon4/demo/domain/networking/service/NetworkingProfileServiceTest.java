@@ -55,13 +55,14 @@ class NetworkingProfileServiceTest {
     }
 
     @Test
-    void rejectsUnknownPosition() {
+    void acceptsApiPositionAlias() {
         NetworkingProfileSearchCondition condition = new NetworkingProfileSearchCondition(
                 null, null, null, "UX_UI_DESIGNER", null, 0, 20
         );
+        when(networkingProfileRepository.findAll(condition))
+                .thenReturn(new NetworkingProfilePage(List.of(profile()), 1));
 
-        assertThatThrownBy(() -> networkingProfileService.getProfiles(condition))
-                .isInstanceOf(InvalidNetworkingProfileSearchException.class);
+        assertThat(networkingProfileService.getProfiles(condition).content()).hasSize(1);
     }
 
     @Test
@@ -71,7 +72,7 @@ class NetworkingProfileServiceTest {
         var response = networkingProfileService.getProfile(2L);
 
         assertThat(response.userId()).isEqualTo(2L);
-        assertThat(response.position()).isEqualTo("DESIGN");
+        assertThat(response.position()).isEqualTo("UX_UI_DESIGNER");
         assertThat(response.skills()).containsExactly("Figma", "Photoshop");
     }
 
@@ -86,7 +87,7 @@ class NetworkingProfileServiceTest {
     private NetworkingProfileRecord profile() {
         return new NetworkingProfileRecord(
                 1L, 2L, "김신충", null, "홍익대학교", "시각디자인과", 3,
-                "DESIGN", "사용자 경험을 설계하는 디자이너입니다.",
+                "UX_UI_DESIGNER", "사용자 경험을 설계하는 디자이너입니다.",
                 "https://github.com/example", null, null, List.of("Figma", "Photoshop")
         );
     }

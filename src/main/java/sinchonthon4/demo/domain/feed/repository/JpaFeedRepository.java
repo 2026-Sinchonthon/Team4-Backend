@@ -11,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import sinchonthon4.demo.domain.group.entity.enums.GroupMemberStatus;
 import sinchonthon4.demo.domain.group.entity.enums.GroupStatus;
-import sinchonthon4.demo.domain.networking.entity.enums.NetworkingEventStatus;
-import sinchonthon4.demo.domain.networking.entity.enums.NetworkingParticipantStatus;
 
 @Repository
 @RequiredArgsConstructor
@@ -27,7 +25,6 @@ public class JpaFeedRepository implements FeedRepository {
 
         List<DatedFeedItem> items = new ArrayList<>();
         items.addAll(findGroups(fetchLimit));
-        items.addAll(findNetworkingEvents(fetchLimit));
         items.addAll(findJobPostings(fetchLimit));
         items.sort(Comparator.comparing(DatedFeedItem::sortTime).reversed());
 
@@ -37,7 +34,7 @@ public class JpaFeedRepository implements FeedRepository {
                 .map(DatedFeedItem::item)
                 .toList();
 
-        long totalElements = countGroups() + countNetworkingEvents() + countCurrentJobPostings();
+        long totalElements = countGroups() + countCurrentJobPostings();
         return new FeedPage(content, totalElements);
     }
 
@@ -63,10 +60,13 @@ public class JpaFeedRepository implements FeedRepository {
                     long currentMembers = (Long) row[3];
                     GroupStatus status = (GroupStatus) row[4];
                     int maxMembers = (Integer) row[5];
+                    String categoryName = (String) row[2];
+                    boolean networkingEvent = isNetworkingCategory(categoryName);
                     return new DatedFeedItem(
                             new FeedItemRecord(
-                                    "GROUP", (Long) row[0], (String) row[1],
-                                    row[2] + " · 인원수 " + currentMembers + "명",
+                                    networkingEvent ? "NETWORKING_EVENT" : "GROUP",
+                                    (Long) row[0], (String) row[1],
+                                    categoryName + " · 인원수 " + currentMembers + "명",
                                     null,
                                     status == GroupStatus.RECRUITING && currentMembers < maxMembers,
                                     null, null, null
@@ -77,51 +77,11 @@ public class JpaFeedRepository implements FeedRepository {
                 .toList();
     }
 
-    private List<DatedFeedItem> findNetworkingEvents(int limit) {
-        return entityManager.createQuery(
-                        """
-                        SELECT event.id, event.title, event.eventType, event.thumbnailUrl,
-                               event.location, COUNT(participant.id), event.status,
-                               event.maxParticipants, event.createdAt
-                        FROM NetworkingEvent event
-                        LEFT JOIN NetworkingEventParticipant participant
-                               ON participant.event = event AND participant.status = :approved
-                        GROUP BY event.id, event.title, event.eventType, event.thumbnailUrl,
-                                 event.location, event.status, event.maxParticipants, event.createdAt
-                        ORDER BY event.createdAt DESC
-                        """,
-                        Object[].class
-                )
-                .setParameter("approved", NetworkingParticipantStatus.APPROVED)
-                .setMaxResults(limit)
-                .getResultList()
-                .stream()
-                .map(row -> {
-                    long currentParticipants = (Long) row[5];
-                    String eventType = row[2].toString();
-                    String eventLabel = switch (eventType) {
-                        case "COFFEE_CHAT" -> "커피챗";
-                        case "RECRUITING_SESSION" -> "채용설명회";
-                        default -> "네트워킹";
-                    };
-                    NetworkingEventStatus status = (NetworkingEventStatus) row[6];
-                    int maxParticipants = (Integer) row[7];
-                    return new DatedFeedItem(
-                            new FeedItemRecord(
-                                    "NETWORKING_EVENT", (Long) row[0], (String) row[1],
-                                    eventLabel + " · 인원수 " + currentParticipants + "명",
-                                    (String) row[3],
-                                    status == NetworkingEventStatus.RECRUITING
-                                            && currentParticipants < maxParticipants,
-                                    (String) row[4], null, null
-                            ),
-                            (LocalDateTime) row[8]
-                    );
-                })
-                .toList();
-    }
-
     private List<DatedFeedItem> findJobPostings(int limit) {
+        if (!isEntityMapped("JobPosting")) {
+            return List.of();
+        }
+
         return entityManager.createQuery(
                         """
                         SELECT posting.id, posting.title, posting.description, posting.thumbnailUrl,
@@ -154,12 +114,11 @@ public class JpaFeedRepository implements FeedRepository {
                 .getSingleResult();
     }
 
-    private long countNetworkingEvents() {
-        return entityManager.createQuery("SELECT COUNT(event) FROM NetworkingEvent event", Long.class)
-                .getSingleResult();
-    }
-
     private long countCurrentJobPostings() {
+        if (!isEntityMapped("JobPosting")) {
+            return 0;
+        }
+
         return entityManager.createQuery(
                         "SELECT COUNT(posting) FROM JobPosting posting WHERE posting.deadline >= :today",
                         Long.class
@@ -168,9 +127,18 @@ public class JpaFeedRepository implements FeedRepository {
                 .getSingleResult();
     }
 
+    private boolean isEntityMapped(String entityName) {
+        return entityManager.getMetamodel().getEntities().stream()
+                .anyMatch(entityType -> entityType.getName().equals(entityName));
+    }
+
     private String deadlineLabel(LocalDate deadline) {
         long remainingDays = Math.max(ChronoUnit.DAYS.between(LocalDate.now(), deadline), 0);
         return "D-" + remainingDays;
+    }
+
+    private boolean isNetworkingCategory(String categoryName) {
+        return "커피챗".equals(categoryName) || "네트워킹".equals(categoryName);
     }
 
     private record DatedFeedItem(FeedItemRecord item, LocalDateTime sortTime) {

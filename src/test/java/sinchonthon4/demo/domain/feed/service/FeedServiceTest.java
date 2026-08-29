@@ -26,9 +26,13 @@ class FeedServiceTest {
 
     @Test
     void returnsUnifiedFeedWithPagination() {
-        when(feedRepository.findAll(0, 2)).thenReturn(new FeedPage(List.of(
+        when(feedRepository.findAll(0, 20)).thenReturn(new FeedPage(List.of(
                 new FeedItemRecord(
                         "GROUP", 1L, "Spring boot 스터디", "프로젝트 · 인원수 2명",
+                        null, true, null, null, null
+                ),
+                new FeedItemRecord(
+                        "NETWORKING_EVENT", 2L, "신촌 개발자 커피챗", "커피챗 · 인원수 2명",
                         null, true, null, null, null
                 ),
                 new FeedItemRecord(
@@ -37,12 +41,12 @@ class FeedServiceTest {
                 )
         ), 3));
 
-        var response = feedService.getFeed(0, 2);
+        var response = feedService.getFeed(0, 20);
 
-        assertThat(response.content()).hasSize(2);
+        assertThat(response.content()).hasSize(3);
         assertThat(response.content().getFirst().contentType()).isEqualTo("GROUP");
         assertThat(response.totalElements()).isEqualTo(3);
-        assertThat(response.totalPages()).isEqualTo(2);
+        assertThat(response.totalPages()).isEqualTo(1);
     }
 
     @Test

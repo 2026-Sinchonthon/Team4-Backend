@@ -22,7 +22,7 @@ public class NetworkingProfileService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final Set<String> POSITIONS = Set.of(
             "BACKEND", "FRONTEND", "FULLSTACK", "AI_ML", "DATA", "MOBILE",
-            "DESIGN", "PM", "MARKETING", "BUSINESS", "OTHER"
+            "DESIGN", "UX_UI_DESIGNER", "PM", "MARKETING", "BUSINESS", "OTHER"
     );
 
     private final NetworkingProfileRepository networkingProfileRepository;
