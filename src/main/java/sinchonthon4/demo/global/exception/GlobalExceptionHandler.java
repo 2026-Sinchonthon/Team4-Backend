@@ -2,6 +2,7 @@ package sinchonthon4.demo.global.exception;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -38,6 +39,17 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(
                         errorCode.getHttpStatus().value(),
                         message,
+                        ErrorResponse.of(errorCode)));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleUnreadableMessage() {
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT;
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(ApiResponse.fail(
+                        errorCode.getHttpStatus().value(),
+                        errorCode.getMessage(),
                         ErrorResponse.of(errorCode)));
     }
 }
