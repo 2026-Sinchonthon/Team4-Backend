@@ -23,7 +23,8 @@ public class PortfolioService {
     @Transactional
     public PortfolioResponse create(Long currentUserId, PortfolioRequest request) {
         User user = getUser(currentUserId);
-        Portfolio portfolio = Portfolio.create(user, request.imageUrl());
+        Portfolio portfolio = Portfolio.create(
+                user, request.title(), request.description(), request.imageUrls());
         return PortfolioResponse.from(portfolioRepository.save(portfolio));
     }
 
@@ -41,7 +42,7 @@ public class PortfolioService {
         Portfolio portfolio = getPortfolio(portfolioId);
         validateOwner(portfolio, currentUserId);
 
-        portfolio.updateImageUrl(request.imageUrl());
+        portfolio.update(request.title(), request.description(), request.imageUrls());
         return PortfolioResponse.from(portfolio);
     }
 

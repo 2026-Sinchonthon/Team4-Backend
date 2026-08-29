@@ -138,14 +138,18 @@ class MyPageApiIntegrationTest {
     @Test
     void authenticatedUserCanCreateListUpdateAndDeletePortfolio() throws Exception {
         User user = createUser();
-        String imageUrl = "https://example.com/portfolio.png";
+        String firstImage = "https://example.com/portfolio-1.png";
+        String secondImage = "https://example.com/portfolio-2.png";
 
         MvcResult createResult = mockMvc.perform(post("/api/portfolios")
                         .header("Authorization", bearerToken(user))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioRequest(imageUrl)))
+                        .content(portfolioRequest("내 포트폴리오", firstImage, secondImage)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+                .andExpect(jsonPath("$.data.title").value("내 포트폴리오"))
+                .andExpect(jsonPath("$.data.imageUrls.length()").value(2))
+                .andExpect(jsonPath("$.data.imageUrls[0]").value(firstImage))
+                .andExpect(jsonPath("$.data.imageUrls[1]").value(secondImage))
                 .andReturn();
 
         Number portfolioIdValue = JsonPath.read(
@@ -157,15 +161,18 @@ class MyPageApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].portfolioId").value(portfolioId))
-                .andExpect(jsonPath("$.data[0].imageUrl").value(imageUrl));
+                .andExpect(jsonPath("$.data[0].imageUrls.length()").value(2))
+                .andExpect(jsonPath("$.data[0].imageUrls[0]").value(firstImage));
 
-        String updatedImageUrl = "https://example.com/portfolio-updated.png";
+        String updatedImage = "https://example.com/portfolio-updated.png";
         mockMvc.perform(patch("/api/portfolios/{portfolioId}", portfolioId)
                         .header("Authorization", bearerToken(user))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioRequest(updatedImageUrl)))
+                        .content(portfolioRequest("수정된 포트폴리오", updatedImage)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.imageUrl").value(updatedImageUrl));
+                .andExpect(jsonPath("$.data.title").value("수정된 포트폴리오"))
+                .andExpect(jsonPath("$.data.imageUrls.length()").value(1))
+                .andExpect(jsonPath("$.data.imageUrls[0]").value(updatedImage));
 
         mockMvc.perform(delete("/api/portfolios/{portfolioId}", portfolioId)
                         .header("Authorization", bearerToken(user)))
@@ -179,17 +186,18 @@ class MyPageApiIntegrationTest {
     void otherUserCannotUpdatePortfolio() throws Exception {
         User owner = createUser();
         User otherUser = createUser();
-        String originalImageUrl = "https://example.com/owner-portfolio.png";
-        Portfolio portfolio = portfolioRepository.save(Portfolio.create(owner, originalImageUrl));
+        String originalImage = "https://example.com/owner-portfolio.png";
+        Portfolio portfolio = portfolioRepository.save(
+                Portfolio.create(owner, "소유자 포트폴리오", null, java.util.List.of(originalImage)));
 
         mockMvc.perform(patch("/api/portfolios/{portfolioId}", portfolio.getId())
                         .header("Authorization", bearerToken(otherUser))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioRequest("https://example.com/unauthorized.png")))
+                        .content(portfolioRequest("탈취 시도", "https://example.com/unauthorized.png")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.data.errorCode").value("PORTFOLIO_FORBIDDEN"));
 
-        assertThat(portfolio.getImageUrl()).isEqualTo(originalImageUrl);
+        assertThat(portfolio.getImageUrls()).containsExactly(originalImage);
     }
 
     private User createUser() {
@@ -248,11 +256,16 @@ class MyPageApiIntegrationTest {
                 """.formatted(nickname, ids);
     }
 
-    private String portfolioRequest(String imageUrl) {
+    private String portfolioRequest(String title, String... imageUrls) {
+        String urls = String.join(", ", Arrays.stream(imageUrls)
+                .map("\"%s\""::formatted)
+                .toList());
         return """
                 {
-                  "imageUrl": "%s"
+                  "title": "%s",
+                  "description": null,
+                  "imageUrls": [%s]
                 }
-                """.formatted(imageUrl);
+                """.formatted(title, urls);
     }
 }
