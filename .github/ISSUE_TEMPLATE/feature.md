@@ -1,11 +1,10 @@
 ---
-
 name: Feature
 about: 새로운 기능 개발
 title: "[FEAT] "
-labels: feature
+labels: enhancement
 assignees: ''
--------------
+---
 
 ## 기능 설명
 
