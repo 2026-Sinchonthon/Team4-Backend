@@ -53,7 +53,7 @@ public class Profile {
     @Column(nullable = false, length = 20)
     private Position position;
 
-    @Column(nullable = false, length = 500)
+    @Column(length = 500)
     private String introduction;
 
     @Column(name = "profile_image_url", length = 500)
@@ -97,5 +97,20 @@ public class Profile {
                                  String githubUrl, String linkedinUrl, String portfolioUrl) {
         return new Profile(user, nickname, school, major, grade, position, introduction,
                 profileImageUrl, githubUrl, linkedinUrl, portfolioUrl);
+    }
+
+    public void updateDetails(String nickname, String school, String major, int grade,
+                              Position position, String introduction, String profileImageUrl,
+                              String githubUrl, String linkedinUrl, String portfolioUrl) {
+        this.nickname = nickname;
+        this.school = school;
+        this.major = major;
+        this.grade = grade;
+        this.position = position;
+        this.introduction = introduction;
+        this.profileImageUrl = profileImageUrl;
+        this.githubUrl = githubUrl;
+        this.linkedinUrl = linkedinUrl;
+        this.portfolioUrl = portfolioUrl;
     }
 }
