@@ -31,10 +31,12 @@ public enum ErrorCode {
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 모임입니다."),
     GROUP_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 카테고리입니다."),
     GROUP_NOT_RECRUITING(HttpStatus.BAD_REQUEST, "모집 중인 모임이 아닙니다."),
+    GROUP_APPLICATION_CLOSED(HttpStatus.BAD_REQUEST, "참가 신청이 마감되었습니다."),
     GROUP_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참가 신청한 모임입니다."),
     GROUP_FULL(HttpStatus.CONFLICT, "모임 정원이 가득 찼습니다."),
     GROUP_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 작업을 수행할 권한이 없습니다."),
-    GROUP_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 참가자입니다.");
+    GROUP_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 참가자입니다."),
+    GROUP_MEMBER_NOT_PENDING(HttpStatus.CONFLICT, "대기 중인 참가 신청이 아닙니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

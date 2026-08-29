@@ -94,4 +94,21 @@ public class Group {
         this.status = status != null ? status : GroupStatus.RECRUITING;
         this.openChatUrl = openChatUrl;
     }
+
+    public void update(GroupCategory category, String title, String description, String location,
+                       LocalDateTime meetingAt, LocalDateTime applicationDeadline,
+                       int maxMembers, String openChatUrl) {
+        this.category = category;
+        this.title = title;
+        this.description = description;
+        this.location = location;
+        this.meetingAt = meetingAt;
+        this.applicationDeadline = applicationDeadline;
+        this.maxMembers = maxMembers;
+        this.openChatUrl = openChatUrl;
+    }
+
+    public void changeStatus(GroupStatus status) {
+        this.status = status;
+    }
 }

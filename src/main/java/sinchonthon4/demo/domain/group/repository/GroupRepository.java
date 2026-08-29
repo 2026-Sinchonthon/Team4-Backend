@@ -1,9 +1,11 @@
 package sinchonthon4.demo.domain.group.repository;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import sinchonthon4.demo.domain.group.entity.Group;
@@ -11,11 +13,14 @@ import sinchonthon4.demo.domain.group.entity.enums.GroupStatus;
 
 public interface GroupRepository extends JpaRepository<Group, Long> {
 
-    /**
-     * 상세 조회 시 category 를 함께 로딩해 N+1 을 피한다.
-     */
+    /** 상세 조회 시 category 를 함께 로딩해 N+1 을 피한다. */
     @Query("select g from Group g join fetch g.category where g.id = :id")
     Optional<Group> findWithCategoryById(@Param("id") Long id);
+
+    /** 승인 및 정원 변경을 직렬화하기 위해 Group row 에 쓰기 락을 건다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from Group g join fetch g.category where g.id = :id")
+    Optional<Group> findWithCategoryByIdForUpdate(@Param("id") Long id);
 
     /**
      * 목록 검색. 모든 필터는 선택적이며 null 이면 해당 조건을 건너뛴다.
