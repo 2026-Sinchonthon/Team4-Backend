@@ -23,7 +23,7 @@ import sinchonthon4.demo.domain.profile.service.PortfolioService;
 import sinchonthon4.demo.dto.response.ApiResponse;
 import sinchonthon4.demo.global.auth.AuthenticatedUser;
 
-@Tag(name = "Portfolio", description = "마이페이지 포트폴리오 API")
+@Tag(name = "Portfolio", description = "마이페이지 포트폴리오 이미지 API")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/portfolios")
@@ -32,15 +32,15 @@ public class PortfolioController {
 
     private final PortfolioService portfolioService;
 
-    @Operation(summary = "내 포트폴리오 목록 조회")
+    @Operation(summary = "내 포트폴리오 이미지 목록 조회")
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<PortfolioResponse>>> getMyPortfolios(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         List<PortfolioResponse> response = portfolioService.getMyPortfolios(authenticatedUser.userId());
-        return ResponseEntity.ok(ApiResponse.success(200, "내 포트폴리오 목록 조회 성공", response));
+        return ResponseEntity.ok(ApiResponse.success(200, "내 포트폴리오 이미지 목록 조회 성공", response));
     }
 
-    @Operation(summary = "내 포트폴리오 생성")
+    @Operation(summary = "내 포트폴리오 이미지 생성")
     @PostMapping
     public ResponseEntity<ApiResponse<PortfolioResponse>> create(
             @Valid @RequestBody PortfolioRequest request,
@@ -48,10 +48,10 @@ public class PortfolioController {
         PortfolioResponse response = portfolioService.create(authenticatedUser.userId(), request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(201, "포트폴리오가 생성되었습니다.", response));
+                .body(ApiResponse.success(201, "포트폴리오 이미지가 생성되었습니다.", response));
     }
 
-    @Operation(summary = "내 포트폴리오 수정")
+    @Operation(summary = "내 포트폴리오 이미지 수정")
     @PatchMapping("/{portfolioId}")
     public ResponseEntity<ApiResponse<PortfolioResponse>> update(
             @PathVariable Long portfolioId,
@@ -59,15 +59,15 @@ public class PortfolioController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         PortfolioResponse response = portfolioService.update(
                 authenticatedUser.userId(), portfolioId, request);
-        return ResponseEntity.ok(ApiResponse.success(200, "포트폴리오가 수정되었습니다.", response));
+        return ResponseEntity.ok(ApiResponse.success(200, "포트폴리오 이미지가 수정되었습니다.", response));
     }
 
-    @Operation(summary = "내 포트폴리오 삭제")
+    @Operation(summary = "내 포트폴리오 이미지 삭제")
     @DeleteMapping("/{portfolioId}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable Long portfolioId,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         portfolioService.delete(authenticatedUser.userId(), portfolioId);
-        return ResponseEntity.ok(ApiResponse.success(200, "포트폴리오가 삭제되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(200, "포트폴리오 이미지가 삭제되었습니다."));
     }
 }

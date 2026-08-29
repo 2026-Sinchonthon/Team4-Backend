@@ -17,14 +17,15 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import sinchonthon4.demo.domain.user.entity.User;
-import sinchonthon4.demo.global.exception.BusinessException;
-import sinchonthon4.demo.global.exception.ErrorCode;
 
 @Entity
 @Getter
 @Table(name = "portfolios")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Portfolio {
+
+    private static final String IMAGE_PORTFOLIO_TITLE = "portfolio-image";
+    private static final LocalDate IMAGE_PORTFOLIO_STARTED_AT = LocalDate.of(1970, 1, 1);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,18 +35,21 @@ public class Portfolio {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // 기존 DB의 NOT NULL 컬럼을 유지하기 위한 호환 필드
     @Column(nullable = false, length = 100)
     private String title;
 
     @Column(length = 500)
     private String description;
 
+    // 기존 project_url 컬럼을 이미지 URL 저장소로 재사용한다.
     @Column(name = "project_url", length = 500)
-    private String projectUrl;
+    private String imageUrl;
 
     @Column(name = "github_url", length = 500)
     private String githubUrl;
 
+    // 기존 DB의 NOT NULL 컬럼을 유지하기 위한 호환 필드
     @Column(name = "started_at", nullable = false)
     private LocalDate startedAt;
 
@@ -60,31 +64,18 @@ public class Portfolio {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    private Portfolio(User user, String title, String description, String projectUrl,
-                      String githubUrl, LocalDate startedAt, LocalDate endedAt) {
+    private Portfolio(User user, String imageUrl) {
         this.user = user;
-        updateDetails(title, description, projectUrl, githubUrl, startedAt, endedAt);
+        this.title = IMAGE_PORTFOLIO_TITLE;
+        this.startedAt = IMAGE_PORTFOLIO_STARTED_AT;
+        this.imageUrl = imageUrl;
     }
 
-    public static Portfolio create(User user, String title, String description, String projectUrl,
-                                   String githubUrl, LocalDate startedAt, LocalDate endedAt) {
-        return new Portfolio(user, title, description, projectUrl, githubUrl, startedAt, endedAt);
+    public static Portfolio create(User user, String imageUrl) {
+        return new Portfolio(user, imageUrl);
     }
 
-    public void updateDetails(String title, String description, String projectUrl,
-                              String githubUrl, LocalDate startedAt, LocalDate endedAt) {
-        validatePeriod(startedAt, endedAt);
-        this.title = title;
-        this.description = description;
-        this.projectUrl = projectUrl;
-        this.githubUrl = githubUrl;
-        this.startedAt = startedAt;
-        this.endedAt = endedAt;
-    }
-
-    private void validatePeriod(LocalDate startedAt, LocalDate endedAt) {
-        if (endedAt != null && endedAt.isBefore(startedAt)) {
-            throw new BusinessException(ErrorCode.INVALID_PORTFOLIO_PERIOD);
-        }
+    public void updateImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }

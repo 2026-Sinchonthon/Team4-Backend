@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -139,13 +138,14 @@ class MyPageApiIntegrationTest {
     @Test
     void authenticatedUserCanCreateListUpdateAndDeletePortfolio() throws Exception {
         User user = createUser();
+        String imageUrl = "https://example.com/portfolio.png";
 
         MvcResult createResult = mockMvc.perform(post("/api/portfolios")
                         .header("Authorization", bearerToken(user))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioRequest("신촌톤 프로젝트", null)))
+                        .content(portfolioRequest(imageUrl)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.title").value("신촌톤 프로젝트"))
+                .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
                 .andReturn();
 
         Number portfolioIdValue = JsonPath.read(
@@ -156,15 +156,16 @@ class MyPageApiIntegrationTest {
                         .header("Authorization", bearerToken(user)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].portfolioId").value(portfolioId));
+                .andExpect(jsonPath("$.data[0].portfolioId").value(portfolioId))
+                .andExpect(jsonPath("$.data[0].imageUrl").value(imageUrl));
 
+        String updatedImageUrl = "https://example.com/portfolio-updated.png";
         mockMvc.perform(patch("/api/portfolios/{portfolioId}", portfolioId)
                         .header("Authorization", bearerToken(user))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioRequest("신촌톤 프로젝트 개선", "2026-08-31")))
+                        .content(portfolioRequest(updatedImageUrl)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.title").value("신촌톤 프로젝트 개선"))
-                .andExpect(jsonPath("$.data.endedAt").value("2026-08-31"));
+                .andExpect(jsonPath("$.data.imageUrl").value(updatedImageUrl));
 
         mockMvc.perform(delete("/api/portfolios/{portfolioId}", portfolioId)
                         .header("Authorization", bearerToken(user)))
@@ -178,23 +179,17 @@ class MyPageApiIntegrationTest {
     void otherUserCannotUpdatePortfolio() throws Exception {
         User owner = createUser();
         User otherUser = createUser();
-        Portfolio portfolio = portfolioRepository.save(Portfolio.create(
-                owner,
-                "소유자 프로젝트",
-                null,
-                null,
-                null,
-                LocalDate.of(2026, 8, 29),
-                null));
+        String originalImageUrl = "https://example.com/owner-portfolio.png";
+        Portfolio portfolio = portfolioRepository.save(Portfolio.create(owner, originalImageUrl));
 
         mockMvc.perform(patch("/api/portfolios/{portfolioId}", portfolio.getId())
                         .header("Authorization", bearerToken(otherUser))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioRequest("권한 없는 변경", null)))
+                        .content(portfolioRequest("https://example.com/unauthorized.png")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.data.errorCode").value("PORTFOLIO_FORBIDDEN"));
 
-        assertThat(portfolio.getTitle()).isEqualTo("소유자 프로젝트");
+        assertThat(portfolio.getImageUrl()).isEqualTo(originalImageUrl);
     }
 
     private User createUser() {
@@ -253,17 +248,11 @@ class MyPageApiIntegrationTest {
                 """.formatted(nickname, ids);
     }
 
-    private String portfolioRequest(String title, String endedAt) {
-        String endedAtJson = endedAt == null ? "null" : "\"" + endedAt + "\"";
+    private String portfolioRequest(String imageUrl) {
         return """
                 {
-                  "title": "%s",
-                  "description": "신촌 대학생을 위한 로컬 커리어 네트워크입니다.",
-                  "projectUrl": "https://example.com",
-                  "githubUrl": "https://github.com/example/project",
-                  "startedAt": "2026-08-29",
-                  "endedAt": %s
+                  "imageUrl": "%s"
                 }
-                """.formatted(title, endedAtJson);
+                """.formatted(imageUrl);
     }
 }
