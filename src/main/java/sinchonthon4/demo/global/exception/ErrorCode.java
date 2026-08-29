@@ -25,7 +25,13 @@ public enum ErrorCode {
 
     // Profile / Skill
     PROFILE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 온보딩 프로필이 존재합니다."),
+    PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "프로필이 존재하지 않습니다."),
     SKILL_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 기술 스택입니다."),
+
+    // Portfolio
+    PORTFOLIO_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포트폴리오입니다."),
+    PORTFOLIO_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 포트폴리오를 수정하거나 삭제할 권한이 없습니다."),
+    INVALID_PORTFOLIO_PERIOD(HttpStatus.BAD_REQUEST, "종료일은 시작일보다 이전일 수 없습니다."),
 
     // Group
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 모임입니다."),
