@@ -407,6 +407,108 @@ class GroupApiIntegrationTest {
                 .andExpect(jsonPath("$.data.errorCode").value("INVALID_INPUT"));
     }
 
+    @Test
+    void ownerDeletesGroupAndAllMembershipRows() throws Exception {
+        Long groupId = createGroup(4);
+        join(groupId, memberToken);
+        approve(groupId, membership(groupId, member.getId()).getId());
+        join(groupId, anotherToken);
+
+        mockMvc.perform(delete("/api/groups/{groupId}", groupId)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("모임이 삭제되었습니다."));
+
+        assertThat(groupRepository.findById(groupId)).isEmpty();
+        assertThat(groupMemberRepository.findByGroupIdAndUserId(groupId, owner.getId())).isEmpty();
+        assertThat(groupMemberRepository.findByGroupIdAndUserId(groupId, member.getId())).isEmpty();
+        assertThat(groupMemberRepository.findByGroupIdAndUserId(groupId, anotherUser.getId())).isEmpty();
+        mockMvc.perform(get("/api/groups/{groupId}", groupId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.data.errorCode").value("GROUP_NOT_FOUND"));
+    }
+
+    @Test
+    void memberCannotDeleteGroup() throws Exception {
+        Long groupId = createGroup(3);
+        join(groupId, memberToken);
+        approve(groupId, membership(groupId, member.getId()).getId());
+
+        mockMvc.perform(delete("/api/groups/{groupId}", groupId)
+                        .header("Authorization", bearer(memberToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.data.errorCode").value("GROUP_FORBIDDEN"));
+
+        assertThat(groupRepository.findById(groupId)).isPresent();
+        assertThat(groupMemberRepository.findByGroupIdAndUserId(groupId, member.getId())).isPresent();
+    }
+
+    @Test
+    void deletingMissingGroupReturnsNotFound() throws Exception {
+        mockMvc.perform(delete("/api/groups/{groupId}", Long.MAX_VALUE)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.data.errorCode").value("GROUP_NOT_FOUND"));
+    }
+
+    @Test
+    void myGroupsReturnsOwnerApprovedAndPendingOnlyInMeetingOrder() throws Exception {
+        LocalDateTime baseMeetingAt = LocalDateTime.now()
+                .plusDays(20)
+                .truncatedTo(ChronoUnit.SECONDS);
+        Long ownedGroupId = createGroupFor(
+                member, "내가 만든 모임", baseMeetingAt.plusDays(1), 5);
+        Long pendingGroupId = createGroupFor(
+                owner, "신청 중인 모임", baseMeetingAt.plusDays(2), 5);
+        groupService.joinGroup(pendingGroupId, member.getId());
+        Long approvedGroupId = createGroupFor(
+                owner, "참가 중인 모임", baseMeetingAt.plusDays(3), 5);
+        groupService.joinGroup(approvedGroupId, member.getId());
+        groupService.approveMember(
+                approvedGroupId,
+                membership(approvedGroupId, member.getId()).getId(),
+                owner.getId());
+        Long rejectedGroupId = createGroupFor(
+                owner, "거절된 모임", baseMeetingAt.plusDays(4), 5);
+        groupService.joinGroup(rejectedGroupId, member.getId());
+        groupService.rejectMember(
+                rejectedGroupId,
+                membership(rejectedGroupId, member.getId()).getId(),
+                owner.getId());
+        createGroupFor(
+                anotherUser, "다른 사용자 모임", baseMeetingAt.plusDays(5), 5);
+
+        mockMvc.perform(get("/api/groups/me")
+                        .header("Authorization", bearer(memberToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].id").value(ownedGroupId))
+                .andExpect(jsonPath("$.data[0].title").value("내가 만든 모임"))
+                .andExpect(jsonPath("$.data[0].category").value(category.getName()))
+                .andExpect(jsonPath("$.data[0].location").value("신촌"))
+                .andExpect(jsonPath("$.data[0].currentMembers").value(1))
+                .andExpect(jsonPath("$.data[0].maxMembers").value(5))
+                .andExpect(jsonPath("$.data[0].groupStatus").value("RECRUITING"))
+                .andExpect(jsonPath("$.data[0].myRole").value("OWNER"))
+                .andExpect(jsonPath("$.data[0].myMemberStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data[1].id").value(pendingGroupId))
+                .andExpect(jsonPath("$.data[1].currentMembers").value(1))
+                .andExpect(jsonPath("$.data[1].myRole").value("MEMBER"))
+                .andExpect(jsonPath("$.data[1].myMemberStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data[2].id").value(approvedGroupId))
+                .andExpect(jsonPath("$.data[2].currentMembers").value(2))
+                .andExpect(jsonPath("$.data[2].myRole").value("MEMBER"))
+                .andExpect(jsonPath("$.data[2].myMemberStatus").value("APPROVED"));
+    }
+
+    @Test
+    void myGroupsRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/groups/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.data.errorCode").value("AUTHENTICATION_REQUIRED"));
+    }
+
     private User saveUser(String email, String name) {
         return userRepository.save(User.create(email, "x".repeat(60), name));
     }
@@ -435,6 +537,20 @@ class GroupApiIntegrationTest {
                 maxMembers,
                 "https://open.example.com"
         ), owner.getId());
+    }
+
+    private Long createGroupFor(User creator, String title,
+                                LocalDateTime groupMeetingAt, int maxMembers) {
+        return groupService.createGroup(new CreateGroupRequest(
+                title,
+                "내 모임 조회 테스트",
+                category.getId(),
+                "신촌",
+                groupMeetingAt,
+                groupMeetingAt.minusDays(2),
+                maxMembers,
+                "https://open.example.com"
+        ), creator.getId());
     }
 
     private void join(Long groupId, String token) throws Exception {

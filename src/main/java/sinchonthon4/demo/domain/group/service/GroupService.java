@@ -14,6 +14,7 @@ import sinchonthon4.demo.domain.group.dto.CreateGroupRequest;
 import sinchonthon4.demo.domain.group.dto.GroupDetailResponse;
 import sinchonthon4.demo.domain.group.dto.GroupMemberResponse;
 import sinchonthon4.demo.domain.group.dto.GroupSummaryResponse;
+import sinchonthon4.demo.domain.group.dto.MyGroupResponse;
 import sinchonthon4.demo.domain.group.dto.UpdateGroupRequest;
 import sinchonthon4.demo.domain.group.entity.Group;
 import sinchonthon4.demo.domain.group.entity.GroupCategory;
@@ -190,6 +191,15 @@ public class GroupService {
         }
     }
 
+    /** OWNER만 잠근 모임과 모든 membership을 같은 트랜잭션에서 삭제할 수 있다. */
+    @Transactional
+    public void deleteGroup(Long groupId, Long currentUserId) {
+        Group group = findGroupForUpdate(groupId);
+        validateOwner(group, currentUserId);
+        groupMemberRepository.deleteAllByGroupId(groupId);
+        groupRepository.delete(group);
+    }
+
     /** 목록의 currentMembers는 APPROVED membership만 집계한다. */
     @Transactional(readOnly = true)
     public Page<GroupSummaryResponse> getGroups(Long categoryId, GroupStatus status,
@@ -199,6 +209,24 @@ public class GroupService {
         Map<Long, Long> approvedCounts = countApprovedMembers(groups.getContent());
         return groups.map(group ->
                 GroupSummaryResponse.of(group, approvedCounts.getOrDefault(group.getId(), 0L)));
+    }
+
+    /** OWNER/APPROVED/PENDING membership을 일정 오름차순으로 반환하고 REJECTED는 제외한다. */
+    @Transactional(readOnly = true)
+    public List<MyGroupResponse> getMyGroups(Long currentUserId) {
+        List<GroupMember> memberships = groupMemberRepository
+                .findMyGroups(currentUserId, List.of(
+                        GroupMemberStatus.APPROVED,
+                        GroupMemberStatus.PENDING));
+        List<Group> groups = memberships.stream()
+                .map(GroupMember::getGroup)
+                .toList();
+        Map<Long, Long> approvedCounts = countApprovedMembers(groups);
+        return memberships.stream()
+                .map(membership -> MyGroupResponse.of(
+                        membership,
+                        approvedCounts.getOrDefault(membership.getGroup().getId(), 0L)))
+                .toList();
     }
 
     /** 익명 상세는 isOwner=false/myMemberStatus=null, 인증 상세는 현재 사용자 기준으로 계산한다. */

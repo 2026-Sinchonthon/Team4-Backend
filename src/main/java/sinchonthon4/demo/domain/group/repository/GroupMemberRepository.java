@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import sinchonthon4.demo.domain.group.entity.GroupMember;
@@ -19,6 +20,20 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
 
     List<GroupMember> findAllByGroupIdAndStatusOrderByJoinedAtAsc(
             Long groupId, GroupMemberStatus status);
+
+    @Query("""
+            select gm from GroupMember gm
+            join fetch gm.group g
+            join fetch g.category
+            where gm.userId = :userId and gm.status in :statuses
+            order by g.meetingAt asc, g.id asc
+            """)
+    List<GroupMember> findMyGroups(@Param("userId") Long userId,
+                                   @Param("statuses") Collection<GroupMemberStatus> statuses);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from GroupMember gm where gm.group.id = :groupId")
+    int deleteAllByGroupId(@Param("groupId") Long groupId);
 
     /** 참가자 수 집계 시 APPROVED 상태만 포함한다. */
     long countByGroupIdAndStatus(Long groupId, GroupMemberStatus status);
