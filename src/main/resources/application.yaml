@@ -1,29 +1,54 @@
 spring:
   application:
-    name: demo
-
-spring:
-  # H2 Database 설정
-  application:
     name: sinchonthon4
 
-  datasource:
-    url: jdbc:h2:mem:testdb # H2 DB연결 주소 (In-Memory Mode)
-    driver-class-name: org.h2.Driver
-    username: admin       # H2 DB 접속 ID (사용자 지정)
-    password: admin     # H2 DB 접속 PW (사용자 지정)
+  # 활성 프로파일 (환경변수 SPRING_PROFILES_ACTIVE 로 override, 기본 local)
+  profiles:
+    default: local
 
-  # H2 Console 설정
-  h2:
-    console:
-      enabled: true     # H2 Console 사용 여부
-      path: /h2-console     # H2 Console 접속 주소
-
-  # JPA 설정
   jpa:
-    hibernate:
-      ddl-auto: update      # DB 초기화 전략 (none, create, create-drop, update, validate)
-    show-sql: true          # 쿼리 로그 출력
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true    # 쿼리 로그 포맷 (정렬)
+        format_sql: true
+
+---
+# 로컬 개발 프로파일 (Docker MySQL)
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/sinchonthon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME:sinchonthon}
+    password: ${DB_PASSWORD:sinchonthon}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+---
+# 배포 프로파일 (RDS MySQL)
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DB_URL}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
